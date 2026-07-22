@@ -1,0 +1,14 @@
+# Ignore everything by default
+/*
+
+# Repository files
+!/.gitignore
+!/README.md
+
+# GitHub Actions must be at the repository root
+!/.github/
+!/.github/**
+
+# OpenRCT2 manifests
+!/openrct2/
+!/openrct2/**
