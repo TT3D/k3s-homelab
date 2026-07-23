@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrct2
+  namespace: openrct2
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: openrct2
+
+  template:
+    metadata:
+      labels:
+        app: openrct2
+
+    spec:
+      terminationGracePeriodSeconds: 90
+
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
+      containers:
+        - name: openrct2
+          image: ghcr.io/tt3d/openrct2-cli
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: multiplayer
+              containerPort: 11753
+              protocol: TCP
+
+          command:
+            - /bin/sh
+            - -ec
+
+          args:
+            - |
+              mkdir -p \
+                /data/config \
+                /data/saves \
+                /data/backups
+
+              echo "Waiting for /data/saves/server.park"
+
+              while [ ! -f /data/saves/server.park ]; do
+                sleep 10
+              done
+
+              CONFIG=/data/config/config.ini
+
+              if [ ! -f "${CONFIG}" ]; then
+                cat > "${CONFIG}" <<'EOF'
+              [general]
+              autosave = 1
+              autosave_amount = 20
+              EOF
+              fi
+
+              echo "Starting OpenRCT2 server"
+
+              exec openrct2-cli host /data/saves/server.park \
+                --headless \
+                --port 11753 \
+                --user-data-path /data/config \
+                --verbose
+
+          startupProbe:
+            tcpSocket:
+              port: multiplayer
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 60
+
+          readinessProbe:
+            tcpSocket:
+              port: multiplayer
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            tcpSocket:
+              port: multiplayer
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 4
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -ec
+                  - |
+                    echo "OpenRCT2 pod is stopping"
+                    mkdir -p /data/backups/shutdown
+
+                    if [ -f /data/saves/server.park ]; then
+                      cp -p /data/saves/server.park \
+                        "/data/backups/shutdown/server-$(date +%Y%m%d-%H%M%S).park"
+                    fi
+
+                    sleep 10
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openrct2-data

@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openrct2-backup
+  namespace: openrct2
+spec:
+  schedule: "0 */6 * * *"
+  timeZone: America/New_York
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+
+      template:
+        spec:
+          restartPolicy: Never
+
+          securityContext:
+            fsGroup: 1000
+            fsGroupChangePolicy: OnRootMismatch
+
+          containers:
+            - name: backup
+              image: alpine:3.22
+
+              command:
+                - /bin/sh
+                - -ec
+
+              args:
+                - |
+                  SOURCE=/data/saves
+                  DEST=/data/backups/$(date +%Y-%m-%d)
+
+                  mkdir -p "${DEST}"
+
+                  tar -czf \
+                    "${DEST}/openrct2-$(date +%Y%m%d-%H%M%S).tar.gz" \
+                    -C "${SOURCE}" .
+
+                  find /data/backups \
+                    -type f \
+                    -name 'openrct2-*.tar.gz' \
+                    -mtime +30 \
+                    -delete
+
+                  echo "Backup completed:"
+                  ls -lh "${DEST}"
+
+              resources:
+                requests:
+                  cpu: 20m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: openrct2-data

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrct2
+  namespace: openrct2
+  annotations:
+    tailscale.com/hostname: openrct2
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+
+  selector:
+    app: openrct2
+
+  ports:
+    - name: multiplayer
+      port: 11753
+      targetPort: multiplayer
+      protocol: TCP
