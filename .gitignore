@@ -12,3 +12,13 @@
 # OpenRCT2 manifests
 !/openrct2/
 !/openrct2/**
+
+# Allow bootstrap and docs
+!/bootstrap/
+!/bootstrap/**
+
+!/docs/
+!/docs/**
+
+# Ignore local secrets
+/bootstrap/config.env
